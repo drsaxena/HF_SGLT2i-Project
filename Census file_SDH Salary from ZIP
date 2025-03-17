@@ -1,0 +1,102 @@
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip17.csv" 
+    OUT= z17
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip18.csv" 
+    OUT= z18
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip19.csv" 
+    OUT= z19
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip20.csv" 
+    OUT= z20
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip21.csv" 
+    OUT= z21
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\census\zip22.csv" 
+    OUT= z22
+    DBMS=csv REPLACE;
+GETNAMES=YES;
+RUN;
+
+
+ data allzip (rename=(zip_cd=zip));;
+ set z17-z22;
+ run;
+proc print data=allzip_clean (obs=10); run;
+
+data income;
+set hf.ourdata1;
+run;
+
+
+
+/* Step 1: Sort both datasets by zip_cd and year */
+proc sort data=income;
+    by zip_cd year;  
+run;
+
+
+/* Step 2: Remove 'ZCTA5' prefix from zip_cd in allzip */
+data allzip_clean;
+    set allzip;
+    /* Remove the 'ZCTA5' prefix from zip_cd (assuming ZCTA5 is always 5 characters long) */
+    zip_cd = substr(zip, 7); /* Starting from the 7th character to get the actual ZIP code */
+run;
+
+/* Step 3: Sort the cleaned allzip data */
+proc sort data=allzip_clean;
+    by zip_cd year;
+run;
+
+
+/* Step 4: Merge datasets, keeping all patients from hf.ourdata */
+data income_zip;
+    merge income(in=a) allzip_clean(in=b );
+    by zip_cd year;
+
+    /* Keep all records from hf.ourdata, even if there is no match in allzip */
+    if a;
+run;
+
+proc print data=income_zip (obs=10); run;
+
+data hf.ourdata1;
+set income_zip;
+run;
+
+data hf.ourdata1;
+set hf.ourdata1;
+if income > 0 and income <= 40000 then wage = 1; 
+else if income > 40000 and income <= 79999 then wage = 2;
+else if income > 79999 and income <= 149999 then wage = 3;
+else if income > 149999 then wage = 4;
+run;
+
+
+
+data hf.ourdata1;
+set hf.ourdata1;
+if wage=. then wage=9;
+run;
+
+proc freq data =hf.ourdata1;
+tables wage;
+run;
+
+PROC PRINT DATA=HF.OURDATA1 (obs=10); run;
