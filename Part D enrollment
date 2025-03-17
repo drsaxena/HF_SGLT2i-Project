@@ -1,1 +1,78 @@
+%macro bene_pd (yr, infill, indata);
 
+data pd&yr (keep = bene_id  PD_&yr );
+  set &infill..&indata;
+  array  cntrct{12} PTDCNTRCT01-PTDCNTRCT12;
+  do i=1 to 12;
+  if cntrct {i} in ("N", "0", "X", "*","", "." ) then cntrct {i}="N";
+  else if cntrct {i} not in ("N", "0", "X", "*","" , ".") then cntrct {i}="Y";
+  end;
+  PD_&yr = compress(PTDCNTRCT01||PTDCNTRCT02||PTDCNTRCT03||PTDCNTRCT04||PTDCNTRCT05||
+PTDCNTRCT06||PTDCNTRCT07||PTDCNTRCT08||PTDCNTRCT09||PTDCNTRCT10||PTDCNTRCT11||PTDCNTRCT12, " ");
+run;
+
+proc sort data=pd&yr; by bene_id; run;
+%mend ;
+%bene_pd(2016, tx2016, mbsf_abcd2016);
+%bene_Pd(2019, tx2019,mbsf_abcd2019);
+%bene_pd(2020, tx2020,mbsf_abcd2020);
+
+%macro bene_pd (yr, infill, indata);
+
+data pd&yr (keep = bene_id  PD_&yr );
+  set &infill..&indata;
+  array  cntrct{12} PTD_CNTRCT_ID_01-PTD_CNTRCT_ID_12;
+  do i=1 to 12;
+  if cntrct {i} in ("N", "0", "X", "*","" ) then cntrct {i}="N";
+  else if cntrct {i} not in ("N", "0", "X", "*","" ) then cntrct {i}="Y";
+  end;
+  PD_&yr = compress(PTD_CNTRCT_ID_01||PTD_CNTRCT_ID_02||PTD_CNTRCT_ID_03||PTD_CNTRCT_ID_04||PTD_CNTRCT_ID_05||
+PTD_CNTRCT_ID_06||PTD_CNTRCT_ID_07||PTD_CNTRCT_ID_08||PTD_CNTRCT_ID_09||PTD_CNTRCT_ID_10||PTD_CNTRCT_ID_11||PTD_CNTRCT_ID_12, " ");
+run;
+
+proc sort data=pd&yr; by bene_id; run;
+%mend ;
+%bene_pd(2017, tx2017,mbsf_abcd_summary17);
+%bene_pd(2018, tx2018,mbsf_abcd_summary18);
+%bene_pd(2021,tx2021,mbsf_abcd_summary); 
+%bene_pd(2022,tx2022, mbsf_abcd_summary);
+data hf.pd;
+merge pd2017-pd2022;
+by bene_id;run;
+
+data HF.hf7;
+merge hf.pd (in=a) HF.bene (in=b);
+by bene_id;
+if a and b;
+run;
+data hf7; set HF.hf7; 
+array miss {6} PD_2017-PD_2022;
+DO I=1 TO 6;
+IF miss{i}= "" then miss{i}= "000000000000";
+END; RUN; 
+
+data hf8; set hf7;
+
+partd_all=compress(pd_2017||PD_2018||PD_2019||PD_2020||PD_2021||PD_2022);
+run;
+proc print data=hf.pd (obs=10); run;
+
+/*PART D ENROLLMENT - FROM INDEX DATE TO 6 MONTHS AFTER
+
+2017 TO 2022*/
+data HF.hf9;
+set hf8;
+partd=0;
+start=(year-2017)*12+month (hf_date) -0;
+
+if death_dt^=. and death_dt<=hf_date+183 then end=(year(death_dt)-2017)*12+month (death_dt) ;
+else end=(year(hf_date+183)-2017)*12+month (hf_date+183) ;
+
+do i=start to end until (substr(partd_all,i,1) not in ("Y"));
+if substr(partd_all,i,1) in  ("Y") then partD+1; END;
+
+if partD=end-start+1  then INSUR_D=1; else INSUR_D=0;
+if insur_d=1;
+run;
+
+proc print data=HF.hf9 (obs=10); run;
