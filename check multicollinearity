@@ -1,0 +1,12 @@
+/*CHECK MULTICOLLINEARITY BETWEEN CKD & DIAB
+
+USED COLLIN & VIF*/
+proc reg data=sglt;
+   model sglt = diab ckd / collin;
+run;
+proc reg data=sglt;
+   model sglt = race agecat  poor finaltype diab obesity ckd uti ischemic pvd / collin;
+run;
+proc reg data=sglt;
+   model sglt =     diab  ckd  / vif;
+run;
