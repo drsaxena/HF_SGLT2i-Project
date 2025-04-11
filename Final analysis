@@ -1,0 +1,209 @@
+/************************************************************************************************/
+/*START DESCRIPTIVES*/
+/*************************************************************************************************/
+
+proc contents data=hf.sample; run;
+
+proc print data=hf.sample (obs=10); run;
+data death;
+set hf.sample;
+death=0;
+if death_dt^=. then death=1;
+run;
+
+/*WE CHANGED HF TYPE GROUPS BASED ON LATEST DISCUSSION WITH ALBAENI AND ZUBAIE
+
+FINAL DATASET IS = HF.SAMPLE
+HF TYPE VARIABLE IS FINALTYPE
+WHERE -
+1= HFREF
+2-HFPEF
+3=OTHER*/
+
+data hf.sample 
+(keep= zip_cd STATE ZIP_TYPE RUCA1 RUCA2 bene_id KIDNEY BENE_DOB DEATH_DT SEX RTI_RACE_CD OREC HF_AD_DT hf_date ICD_DGNS_CD1 ICD_DGNS_CD2 ICD_DGNS_CD3 ICD_DGNS_CD4 ICD_DGNS_CD5 
+ICD_DGNS_CD6 ICD_DGNS_CD7 ICD_DGNS_CD8 ICD_DGNS_CD9 ICD_DGNS_CD10 ICD_DGNS_CD11 ICD_DGNS_CD12 ICD_DGNS_CD13 ICD_DGNS_CD14 ICD_DGNS_CD15 ICD_DGNS_CD16 ICD_DGNS_CD17 ICD_DGNS_CD18
+ICD_DGNS_CD19 ICD_DGNS_CD20 ICD_DGNS_CD21 ICD_DGNS_CD22 ICD_DGNS_CD23 ICD_DGNS_CD24 ICD_DGNS_CD25 PRCDRCD1 PRCDRCD2 PRCDRCD3 PRCDRCD4 PRCDRCD5 PRCDRCD6 PRCDRCD7 PRCDRCD8 PRCDRCD9 
+PRCDRCD10 PRCDRCD11 PRCDRCD12 PRCDRCD13 PRCDRCD14 PRCDRCD15 PRCDRCD16 PRCDRCD17 PRCDRCD18 PRCDRCD19 PRCDRCD20 PRCDRCD21 PRCDRCD22 PRCDRCD23 PRCDRCD24 PRCDRCD25 am hf year age sglt
+sgl_dt pres_90 income wage PHYSICAL_CITY PHYSICAL_STATE agecat race poor DIAB obesity bp Hypothyroidism LIVER lung cad prior_icd pvd ckd ckd1 ckd2 ckd3 ckd4
+a_fib a_flutter lipid smoking alcohol
+depression prior_stroke prior_cabg Prior_pci PMI uti ischemic amlodipine_olmesartan amlodipine_valsartan azilsartan benazepril bisoprolol candesartan captopril carvedilol enalapril
+eplerenone eprosartan irbesartan isosorbide lisinopril losartan metoprolol moexipril nebivolol_valsartan olmesartan perindopril quinapril ramipril entresto spironolactone telmisartan
+trandolapril valsartan prescribed_medicine bb ace arb mra arni nit bb_arb ace_arb ccb_arb  i  finalref finalpef finalo finaltype) ;
+set check;
+run;
+proc print data=hf.sample (obs=10); run;
+
+proc freq data=hf.sample;
+tables finaltype*sglt/chisq;run;
+
+
+
+proc sort data=death;
+   by sex;
+run;
+proc ttest data=hf.sample;
+   class sglt; /* Grouping variable */
+   var age;    /* Continuous variable */
+   by sex;     /* Stratify analysis by sex */
+run;
+
+proc ttest data=hf.sample;
+   class sglt; /* Grouping variable */
+   var age;    
+run;
+
+data sglt;
+set hf.sample;
+if sglt=1;run;
+
+
+PROC FREQ DATA=hf.sample;
+tables smoking*SGLT/CHISQ FISHER; run;
+
+
+proc freq data=hf.sample;
+tables sglt*finaltype/chisq; run;
+
+
+proc freq data=hf.sample;
+tables finalckd*sglt/chisq;run;
+
+data ckd_final;
+    set hf.sample; /* CKD VARIABLE- FINALCKD
+	WE HAVE MULTIPLE PATIENST WITH CKD MULTIPLE LEVELS.WILL TAKE THE HIGHEST CKD LEVEL */
+    array ckdarray[4] ckd1-ckd4;
+    finalckd = 0;
+
+    do i = 1 to 4;
+        if ckdarray[i] = 1 then finalckd = i;
+    end;
+
+    drop i;
+run;
+
+
+proc print data=ckd_final (obs=100); 
+var ckd1 ckd2 ckd3 ckd4 finalckd;
+run;
+
+data hf.sample;set ckd_final;run;
+
+/*proc logistic data=hf.sample;
+class hf_type (ref='2');
+model sglt (event='1')= hf_type;
+run; 
+comes 1.4 
+*/
+
+proc logistic data=hf.sample;
+class agecat (ref='1') finaltype (ref='2') diab (ref='0') race (ref='1') sex (ref='2') poor (ref='0') obesity (ref='0') 
+uti (ref='0') finalckd (ref='0') ischemic (ref='0')
+pvd (ref='0')/param=ref;
+model sglt (event='1')= pvd; run;
+
+
+
+
+proc logistic data=hf.sample;
+class agecat (ref='1') finaltype (ref='2') diab (ref='0') race (ref='1') sex (ref='2') poor (ref='0') obesity (ref='0') 
+uti (ref='0') finalckd (ref='0') ischemic (ref='0')
+pvd (ref='0')/param=ref;
+model sglt (event='1')= agecat sex race poor finaltype diab obesity finalckd uti ischemic pvd;
+run;
+
+
+
+proc freq data=hf.sample; tables finalckd; run;
+
+proc logistic data=hf.sample;
+  class agecat (ref='1') finaltype (ref='2') diab (ref='0') 
+        race (ref='1') sex (ref='2') poor (ref='0') obesity (ref='0')
+        uti (ref='0') finalckd (ref='0') ischemic (ref='0') pvd (ref='0');
+  model sglt(event='1') = agecat sex race poor finaltype diab obesity finalckd uti ischemic pvd;
+  oddsratio finalckd / diff=ref;
+run;
+
+
+
+
+/*WEIGHTED PROPORTIONS FOR RACE ETH*/
+proc sort data=hf.sample;
+by sex;
+run;
+
+proc freq data=hf.sample;
+by sex;
+table agecat*sglt;run;
+
+data sglt;
+set hf.sample;
+sglt_yr= year(sgl_dt);
+run;
+proc print data=sglt (obs=100); run;
+
+data sglt_male;
+set sglt;
+if sex=1;
+run;
+proc sort data=sglt_male; by sglt_yr;run;
+proc freq data=sglt_male;
+by sglt_yr;
+table agecat*sglt;
+run;
+
+data sglt_female;
+set sglt;
+if sex=2;
+run;
+proc sort data=sglt_female; by sglt_yr;run;
+proc freq data=sglt_female;
+by sglt_yr;
+table agecat*sglt;
+run;
+
+
+proc logistic data=sglt;
+   class agecat (ref='1') finaltype (ref='2') diab (ref='0') race (ref='1') sex (ref='2')
+         poor (ref='0') obesity (ref='0') uti (ref='0') ckd (ref='0') 
+         ischemic (ref='0') pvd (ref='0') / param=glm;
+   model sglt(event='1') = race agecat sex poor finaltype diab obesity finalckd uti ischemic pvd;
+   lsmeans race / ilink cl;
+  
+run;
+
+
+
+
+/*FOR GRAPH- RACE ETHNICITY AND SGLT2I*/
+/*1. TAKE ALL PTS WITH SGLT=1
+2. 2 GROUPS- MALE AND FEMALE 
+3. 2 GROUPS AGE LESS & MORE THAN 80
+4. THEN RACE ETHNICTY NUMBERS FOR EACH*/
+
+data re; 
+set sglt;
+if sglt=1;
+run;
+data re;
+set re;
+sgl_yr=year(sgl_dt);
+run;
+
+/*a*/
+data remale;
+set re;
+if sex=1;
+run;
+data refemale;
+set re;
+if sex=2;
+run;
+proc sort data=remale;
+by sgl_yr;
+run;
+
+proc freq data=remale;
+by sgl_yr;
+tables sglt*race/chisq;
+run;
